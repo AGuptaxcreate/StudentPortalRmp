@@ -161,14 +161,19 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, addDoc, updateDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        
-        // Firebase global variables provided by the environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
+  const firebaseConfig = {
+    apiKey: "AIzaSyC9p1fDjIkiBViI0OrGvT0DzYhVADCpO5Q",
+    authDomain: "studentportalsrmrmp.firebaseapp.com",
+    projectId: "studentportalsrmrmp",
+    storageBucket: "studentportalsrmrmp.firebasestorage.app",
+    messagingSenderId: "1066002262528",
+    appId: "1:1066002262528:web:fc6d3cc40124d0989046e5",
+    measurementId: "G-2LFY980T55"
+  };
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
         
         let db;
         let auth;
@@ -592,3 +597,4 @@
     </script>
 </body>
 </html>
+
