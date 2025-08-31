@@ -201,13 +201,18 @@
         // --- Firebase Initialization and Authentication ---
         async function initializeFirebase() {
             try {
+                if (Object.keys(firebaseConfig).length === 0) {
+                    console.error("Firebase config is missing. Cannot initialize Firebase.");
+                    showToast("Firebase configuration is missing.");
+                    return;
+                }
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
-                        elements.appIdDisplay.textContent = `App ID: ${appId}`;
+                        console.log("Authentication successful. User ID:", user.uid);
                         setupRealtimeListeners();
                     } else {
                         // Sign in anonymously if no auth token is provided
@@ -426,7 +431,7 @@
             
             document.querySelectorAll('.grade-select').forEach(select => {
                 select.addEventListener('change', async (e) => {
-                    const gradeDocId = e.target.closest('.grade-cell').dataset.gradeDocid;
+                    const gradeDocId = e.target.closest('.grade-cell').dataset.grade-docid;
                     const newGrade = e.target.value;
                     try {
                         await updateDoc(doc(db, getCollectionPath('grades'), gradeDocId), { grade: newGrade });
@@ -557,6 +562,7 @@
 
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
+            elements.appIdDisplay.textContent = `App ID: ${appId}`;
             initializeFirebase();
             elements.addStudentBtn.addEventListener('click', addStudent);
             elements.addCourseBtn.addEventListener('click', addCourse);
