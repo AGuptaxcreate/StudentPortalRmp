@@ -5,26 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Management System</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, doc, addDoc, updateDoc, deleteDoc, onSnapshot, collection, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-        window.firebaseImports = {
-            initializeApp, getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut,
-            getFirestore, doc, addDoc, updateDoc, deleteDoc, onSnapshot, collection, writeBatch
-        };
-    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            /* Update the background to use an image */
-            background-image: url('srm.webp'); /* Replace with your image URL */
-            background-size: cover; /* This makes the image cover the entire body */
-            background-position: center; /* This centers the image */
-            background-repeat: no-repeat; /* Prevents the image from repeating */
-            background-color: #a4c2fc; /* Fallback color */
+            background-image: url('srm.webp');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-color: #a4c2fc;
         }
         header {
             background: rgba(0, 0, 0, 0.6);
@@ -88,13 +77,6 @@
             90% { opacity: 1; transform: translateY(0); }
             100% { opacity: 0; transform: translateY(20px); }
         }
-        .animate-spin-fast {
-            animation: spin 0.7s linear infinite;
-        }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body>
@@ -103,27 +85,9 @@
             <img src="srmlo.webp" alt="SRM Logo">
             <h1>SRM Student Portal</h1>
         </div>
-        <div class="user-info text-white text-sm md:text-base mt-2 md:mt-0 flex items-center gap-2">
-            <p id="authStatusText">Signed in as: <span id="userIdDisplay">Loading...</span></p>
-            <button id="signOutBtn" class="hidden bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-3 rounded-lg shadow-md transition-colors duration-300 transform hover:scale-105">
-                Sign Out
-            </button>
-        </div>
     </header>
-    
-    <!-- Loading Screen and Main Content -->
-    <div id="loadingScreen" class="absolute inset-0 flex items-center justify-center z-50 bg-gray-100 bg-opacity-80">
-        <div class="text-center">
-            <svg class="animate-spin-fast h-12 w-12 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p class="mt-4 text-lg font-semibold text-gray-700">Connecting to Firebase...</p>
-        </div>
-    </div>
 
-    <!-- Main Content Area -->
-    <div id="mainContent" class="p-4 md:p-10 hidden">
+    <div id="mainContent" class="p-4 md:p-10">
         <!-- Action Buttons -->
         <div class="bg-white rounded-2xl shadow-lg p-4 mb-6 flex flex-wrap justify-center items-center gap-2 md:gap-4">
             <button id="addStudentBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105 w-full md:w-auto">
@@ -170,9 +134,6 @@
                         <!-- Data will be populated by JavaScript -->
                     </tbody>
                 </table>
-                <div id="loadingIndicator" class="hidden text-center py-4">
-                    <p class="text-gray-500 mt-2">Loading data...</p>
-                </div>
             </div>
         </div>
     </div>
@@ -194,18 +155,10 @@
     </div>
 
     <script type="text/javascript">
-        let firebaseApp, auth, db;
-        let userId = null;
         let studentsData = [];
         let coursesData = [];
         let gradesData = [];
-        let firestoreListeners = [];
-
-        // Set up global variables from the canvas environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-        const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
+        
         // UI Element references
         const elements = {
             tableBody: document.getElementById('tableBody'),
@@ -222,105 +175,27 @@
             modalFormContent: document.getElementById('modalFormContent'),
             modalForm: document.getElementById('modalForm'),
             cancelBtn: document.getElementById('cancelBtn'),
-            userIdDisplay: document.getElementById('userIdDisplay'),
-            loadingIndicator: document.getElementById('loadingIndicator'),
-            mainContent: document.getElementById('mainContent'),
-            loadingScreen: document.getElementById('loadingScreen'),
-            signOutBtn: document.getElementById('signOutBtn'),
         };
         
         const gradeOptions = ["A", "B", "C", "D", "F"];
 
-        // --- Firebase Initialization and Auth ---
-        async function initFirebase() {
+        // --- Local Storage Functions ---
+        function saveData() {
+            localStorage.setItem('students', JSON.stringify(studentsData));
+            localStorage.setItem('courses', JSON.stringify(coursesData));
+            localStorage.setItem('grades', JSON.stringify(gradesData));
+        }
+
+        function loadData() {
             try {
-                const { initializeApp, getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, getFirestore } = window.firebaseImports;
-                firebaseApp = initializeApp(firebaseConfig);
-                auth = getAuth(firebaseApp);
-                db = getFirestore(firebaseApp);
-                
-                if (authToken) {
-                    await signInWithCustomToken(auth, authToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                onAuthStateChanged(auth, user => {
-                    if (user) {
-                        userId = user.uid;
-                        elements.userIdDisplay.textContent = user.displayName || user.email || user.uid;
-                        elements.signOutBtn.classList.remove('hidden');
-                        startRealtimeListeners();
-                        elements.loadingScreen.classList.add('hidden'); // Hide loading screen on successful auth
-                        elements.mainContent.classList.remove('hidden'); // Show main content
-                    } else {
-                        // User is signed out
-                        userId = null;
-                        elements.userIdDisplay.textContent = '';
-                        elements.signOutBtn.classList.add('hidden');
-                        unsubscribeListeners();
-                        elements.tableBody.innerHTML = ''; // Clear table
-                        elements.loadingScreen.classList.remove('hidden'); // Show loading screen if signed out
-                        elements.mainContent.classList.add('hidden'); // Hide main content
-                    }
-                });
-
-            } catch (error) {
-                console.error("Firebase initialization failed:", error);
-                showToast("Firebase initialization failed. Check console for details.");
-            }
-        }
-
-        function unsubscribeListeners() {
-            firestoreListeners.forEach(unsubscribe => unsubscribe());
-            firestoreListeners = [];
-        }
-
-        // --- Realtime Data Listeners ---
-        function startRealtimeListeners() {
-            const { onSnapshot, collection } = window.firebaseImports;
-            unsubscribeListeners(); // Unsubscribe from previous listeners
-
-            const firestorePath = `/artifacts/${appId}/users/${userId}/`;
-
-            const studentsRef = collection(db, `${firestorePath}students`);
-            const coursesRef = collection(db, `${firestorePath}courses`);
-            const gradesRef = collection(db, `${firestorePath}grades`);
-
-            firestoreListeners.push(onSnapshot(studentsRef, (snapshot) => {
-                studentsData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
-                loadAllRecords();
-            }, (error) => {
-                console.error("Error fetching students:", error);
-                showToast("Error fetching students data.");
-            }));
-
-            firestoreListeners.push(onSnapshot(coursesRef, (snapshot) => {
-                coursesData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
-                loadAllRecords();
-            }, (error) => {
-                console.error("Error fetching courses:", error);
-                showToast("Error fetching courses data.");
-            }));
-
-            firestoreListeners.push(onSnapshot(gradesRef, (snapshot) => {
-                gradesData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
-                loadAllRecords();
-            }, (error) => {
-                console.error("Error fetching grades:", error);
-                showToast("Error fetching grades data.");
-            }));
-        }
-
-        // --- Auth Functions ---
-        async function handleSignOut() {
-            const { signOut } = window.firebaseImports;
-            try {
-                await signOut(auth);
-                showToast("Signed out successfully.");
-            } catch (error) {
-                console.error("Sign-out Error:", error);
-                showToast("Sign-out failed. Please try again.");
+                studentsData = JSON.parse(localStorage.getItem('students')) || [];
+                coursesData = JSON.parse(localStorage.getItem('courses')) || [];
+                gradesData = JSON.parse(localStorage.getItem('grades')) || [];
+            } catch (e) {
+                console.error("Error loading data from localStorage:", e);
+                studentsData = [];
+                coursesData = [];
+                gradesData = [];
             }
         }
 
@@ -357,13 +232,7 @@
 
         // --- Core Functions ---
 
-        async function addStudent() {
-            if (!userId) {
-                showToast("Please wait for authentication to complete.");
-                return;
-            }
-
-            const { addDoc, collection } = window.firebaseImports;
+        function addStudent() {
             const content = `
                 <div>
                     <label class="block text-gray-700">Student ID:</label>
@@ -374,7 +243,7 @@
                     <input type="text" name="name" class="w-full p-2 border rounded-lg" required>
                 </div>
             `;
-            showModal('Add New Student', content, async (form) => {
+            showModal('Add New Student', content, (form) => {
                 const id = form.id.value.trim();
                 const name = form.name.value.trim();
 
@@ -384,24 +253,15 @@
                     return;
                 }
 
-                try {
-                    await addDoc(collection(db, `/artifacts/${appId}/users/${userId}/students`), { id, name });
-                    showToast("Student added successfully!");
-                    hideModal();
-                } catch (error) {
-                    console.error("Error adding student:", error);
-                    showToast("Error adding student.");
-                }
+                studentsData.push({ id, name });
+                saveData();
+                showToast("Student added successfully!");
+                hideModal();
+                loadAllRecords();
             });
         }
 
-        async function addCourse() {
-            if (!userId) {
-                showToast("Please wait for authentication to complete.");
-                return;
-            }
-
-            const { addDoc, collection } = window.firebaseImports;
+        function addCourse() {
             const content = `
                 <div>
                     <label class="block text-gray-700">Course ID:</label>
@@ -412,7 +272,7 @@
                     <input type="text" name="title" class="w-full p-2 border rounded-lg" required>
                 </div>
             `;
-            showModal('Add New Course', content, async (form) => {
+            showModal('Add New Course', content, (form) => {
                 const id = form.id.value.trim();
                 const title = form.title.value.trim();
                 
@@ -422,24 +282,15 @@
                     return;
                 }
 
-                try {
-                    await addDoc(collection(db, `/artifacts/${appId}/users/${userId}/courses`), { id, title });
-                    showToast("Course added successfully!");
-                    hideModal();
-                } catch (error) {
-                    console.error("Error adding course:", error);
-                    showToast("Error adding course.");
-                }
+                coursesData.push({ id, title });
+                saveData();
+                showToast("Course added successfully!");
+                hideModal();
+                loadAllRecords();
             });
         }
 
-        async function addGrade() {
-            if (!userId) {
-                showToast("Please wait for authentication to complete.");
-                return;
-            }
-
-            const { addDoc, collection, updateDoc, doc } = window.firebaseImports;
+        function addGrade() {
             if (studentsData.length === 0 || coursesData.length === 0) {
                 showToast("Please add students and courses first.");
                 return;
@@ -464,37 +315,29 @@
                 </div>
             `;
 
-            showModal('Add New Grade', content, async (form) => {
+            showModal('Add New Grade', content, (form) => {
                 const studentId = form.studentId.value;
                 const courseId = form.courseId.value;
                 const grade = form.grade.value;
                 
-                const existingGrade = gradesData.find(g => g.studentId === studentId && g.courseId === courseId);
+                const existingGradeIndex = gradesData.findIndex(g => g.studentId === studentId && g.courseId === courseId);
                 
-                try {
-                    if (existingGrade) {
-                        const gradeDocRef = doc(db, `/artifacts/${appId}/users/${userId}/grades`, existingGrade.docId);
-                        await updateDoc(gradeDocRef, { grade });
-                    } else {
-                        await addDoc(collection(db, `/artifacts/${appId}/users/${userId}/grades`), { studentId, courseId, grade });
-                    }
-                    showToast("Grade added successfully!");
-                    hideModal();
-                } catch (error) {
-                    console.error("Error adding/updating grade:", error);
-                    showToast("Error adding/updating grade.");
+                if (existingGradeIndex !== -1) {
+                    gradesData[existingGradeIndex].grade = grade;
+                } else {
+                    gradesData.push({ studentId, courseId, grade });
                 }
+                saveData();
+                showToast("Grade added/updated successfully!");
+                hideModal();
+                loadAllRecords();
             });
         }
 
         function loadAllRecords() {
             elements.tableBody.innerHTML = '';
-            const filteredGrades = gradesData.filter(gradeRecord => {
-                const student = studentsData.find(s => s.id === gradeRecord.studentId);
-                return !!student;
-            });
             
-            filteredGrades.forEach(gradeRecord => {
+            gradesData.forEach(gradeRecord => {
                 const student = studentsData.find(s => s.id === gradeRecord.studentId);
                 const course = coursesData.find(c => c.id === gradeRecord.courseId);
                 
@@ -515,27 +358,21 @@
             });
             
             document.querySelectorAll('.grade-select').forEach(select => {
-                select.addEventListener('change', async (e) => {
+                select.addEventListener('change', (e) => {
                     const studentId = e.target.closest('.grade-cell').dataset.studentId;
                     const courseId = e.target.closest('.grade-cell').dataset.courseId;
                     const newGrade = e.target.value;
-                    await updateGradeInFirestore(studentId, courseId, newGrade);
+                    updateGradeInLocalStorage(studentId, courseId, newGrade);
                 });
             });
         }
 
-        async function updateGradeInFirestore(studentId, courseId, newGrade) {
-            const { updateDoc, doc } = window.firebaseImports;
-            const gradeRecord = gradesData.find(g => g.studentId === studentId && g.courseId === courseId);
-            if (gradeRecord) {
-                try {
-                    const gradeDocRef = doc(db, `/artifacts/${appId}/users/${userId}/grades`, gradeRecord.docId);
-                    await updateDoc(gradeDocRef, { grade: newGrade });
-                    showToast("Grade updated successfully!");
-                } catch (error) {
-                    console.error("Error updating grade:", error);
-                    showToast("Error updating grade.");
-                }
+        function updateGradeInLocalStorage(studentId, courseId, newGrade) {
+            const gradeRecordIndex = gradesData.findIndex(g => g.studentId === studentId && g.courseId === courseId);
+            if (gradeRecordIndex !== -1) {
+                gradesData[gradeRecordIndex].grade = newGrade;
+                saveData();
+                showToast("Grade updated successfully!");
             }
         }
 
@@ -558,41 +395,29 @@
             }
         }
 
-        async function deleteStudent() {
-            const { writeBatch, collection, doc } = window.firebaseImports;
+        function deleteStudent() {
             const id = elements.searchInput.value.trim();
             if (!id) {
                 showToast("Please enter a Student ID to delete.");
                 return;
             }
 
-            const studentToDelete = studentsData.find(s => s.id === id);
-            if (!studentToDelete) {
+            const studentIndex = studentsData.findIndex(s => s.id === id);
+            if (studentIndex === -1) {
                 showToast("Student not found.");
                 return;
             }
 
-            try {
-                const batch = writeBatch(db);
-                
-                // Get all grades associated with the student
-                const gradesToDelete = gradesData.filter(g => g.studentId === id);
-                gradesToDelete.forEach(grade => {
-                    const gradeDocRef = doc(db, `/artifacts/${appId}/users/${userId}/grades`, grade.docId);
-                    batch.delete(gradeDocRef);
-                });
+            // Remove the student
+            studentsData.splice(studentIndex, 1);
+            
+            // Remove all grades associated with the student
+            gradesData = gradesData.filter(g => g.studentId !== id);
 
-                // Delete the student document itself
-                const studentDocRef = doc(db, `/artifacts/${appId}/users/${userId}/students`, studentToDelete.docId);
-                batch.delete(studentDocRef);
-
-                await batch.commit();
-                showToast("Student and their grades deleted successfully!");
-                elements.searchInput.value = '';
-            } catch (error) {
-                console.error("Error deleting student:", error);
-                showToast("Error deleting student.");
-            }
+            saveData();
+            showToast("Student and their grades deleted successfully!");
+            elements.searchInput.value = '';
+            loadAllRecords();
         }
         
         function exportToCSV() {
@@ -626,8 +451,8 @@
 
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
-            initFirebase();
-            elements.signOutBtn.addEventListener('click', handleSignOut);
+            loadData();
+            loadAllRecords();
             elements.addStudentBtn.addEventListener('click', addStudent);
             elements.addCourseBtn.addEventListener('click', addCourse);
             elements.addGradeBtn.addEventListener('click', addGrade);
