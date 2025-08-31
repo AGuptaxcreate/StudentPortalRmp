@@ -110,9 +110,20 @@
             </button>
         </div>
     </header>
+    
+    <!-- Loading Screen and Main Content -->
+    <div id="loadingScreen" class="absolute inset-0 flex items-center justify-center z-50 bg-gray-100 bg-opacity-80">
+        <div class="text-center">
+            <svg class="animate-spin-fast h-12 w-12 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="mt-4 text-lg font-semibold text-gray-700">Connecting to Firebase...</p>
+        </div>
+    </div>
 
     <!-- Main Content Area -->
-    <div id="mainContent" class="p-4 md:p-10">
+    <div id="mainContent" class="p-4 md:p-10 hidden">
         <!-- Action Buttons -->
         <div class="bg-white rounded-2xl shadow-lg p-4 mb-6 flex flex-wrap justify-center items-center gap-2 md:gap-4">
             <button id="addStudentBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105 w-full md:w-auto">
@@ -156,14 +167,10 @@
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200" id="tableBody">
-                        <!-- Loading indicator and data will be populated by JavaScript -->
+                        <!-- Data will be populated by JavaScript -->
                     </tbody>
                 </table>
                 <div id="loadingIndicator" class="hidden text-center py-4">
-                    <svg class="animate-spin-fast h-8 w-8 text-gray-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
                     <p class="text-gray-500 mt-2">Loading data...</p>
                 </div>
             </div>
@@ -218,6 +225,7 @@
             userIdDisplay: document.getElementById('userIdDisplay'),
             loadingIndicator: document.getElementById('loadingIndicator'),
             mainContent: document.getElementById('mainContent'),
+            loadingScreen: document.getElementById('loadingScreen'),
             signOutBtn: document.getElementById('signOutBtn'),
         };
         
@@ -243,6 +251,8 @@
                         elements.userIdDisplay.textContent = user.displayName || user.email || user.uid;
                         elements.signOutBtn.classList.remove('hidden');
                         startRealtimeListeners();
+                        elements.loadingScreen.classList.add('hidden'); // Hide loading screen on successful auth
+                        elements.mainContent.classList.remove('hidden'); // Show main content
                     } else {
                         // User is signed out
                         userId = null;
@@ -250,6 +260,8 @@
                         elements.signOutBtn.classList.add('hidden');
                         unsubscribeListeners();
                         elements.tableBody.innerHTML = ''; // Clear table
+                        elements.loadingScreen.classList.remove('hidden'); // Show loading screen if signed out
+                        elements.mainContent.classList.add('hidden'); // Hide main content
                     }
                 });
 
@@ -276,30 +288,24 @@
             const gradesRef = collection(db, `${firestorePath}grades`);
 
             firestoreListeners.push(onSnapshot(studentsRef, (snapshot) => {
-                elements.loadingIndicator.classList.remove('hidden');
                 studentsData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
                 loadAllRecords();
-                elements.loadingIndicator.classList.add('hidden');
             }, (error) => {
                 console.error("Error fetching students:", error);
                 showToast("Error fetching students data.");
             }));
 
             firestoreListeners.push(onSnapshot(coursesRef, (snapshot) => {
-                elements.loadingIndicator.classList.remove('hidden');
                 coursesData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
                 loadAllRecords();
-                elements.loadingIndicator.classList.add('hidden');
             }, (error) => {
                 console.error("Error fetching courses:", error);
                 showToast("Error fetching courses data.");
             }));
 
             firestoreListeners.push(onSnapshot(gradesRef, (snapshot) => {
-                elements.loadingIndicator.classList.remove('hidden');
                 gradesData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
                 loadAllRecords();
-                elements.loadingIndicator.classList.add('hidden');
             }, (error) => {
                 console.error("Error fetching grades:", error);
                 showToast("Error fetching grades data.");
