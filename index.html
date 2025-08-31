@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            background: url('images/srm.webp') center/cover no-repeat;
+            font-family: 'Inter', sans-serif;
+            background-color: #a4c2fc;
+        }
+    header { background: rgba(0,0,0,0.6); padding:12px; display:flex; align-items:center; }
+    header img { height:60px; margin-right:12px; }
+    header h1 { color:#fff; font-size:22px; margin:0; 
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0,0,0);
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 90%;
+            max-width: 500px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+    <img src="images/srmlo.webp" alt="SRM Logo">
+    <h1>SRM Ramapuram Student Portal</h1>
+  </header>
+<div class="p-6 md:p-10">
+    <!-- Header with Action Buttons -->
+    <div class="bg-white rounded-2xl shadow-lg p-4 mb-6 md:flex md:flex-wrap md:justify-center md:items-center md:space-x-4">
+        <button id="addStudentBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105 mb-2 md:mb-0">
+            Add Student
+        </button>
+        <button id="addCourseBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105 mb-2 md:mb-0">
+            Add Course
+        </button>
+        <button id="addGradeBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105 mb-2 md:mb-0">
+            Add Grade
+        </button>
+        <button id="showRecordsBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105 mb-2 md:mb-0">
+            Show Records
+        </button>
+        <div class="flex-grow"></div>
+        <div class="flex items-center mt-2 md:mt-0">
+            <input type="text" id="searchInput" placeholder="Search by ID..." class="flex-grow p-2 border border-gray-300 rounded-lg mr-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button id="searchBtn" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105">
+                Search
+            </button>
+        </div>
+        <button id="deleteBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105 mt-2 md:mt-0">
+            Delete Student
+        </button>
+        <button id="exportBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105 mt-2 md:mt-0">
+            Export to CSV
+        </button>
+    </div>
+
+    <!-- Main Content Area - Table for displaying records -->
+    <div class="bg-white rounded-2xl shadow-lg p-6">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200" id="recordsTable">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Course</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grade</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200" id="tableBody">
+                    <!-- Table data will be populated here by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Modal for User Input -->
+<div id="inputModal" class="modal">
+    <div class="modal-content">
+        <h2 id="modalTitle" class="text-xl font-semibold mb-4 text-gray-800"></h2>
+        <form id="modalForm">
+            <div id="modalFormContent" class="space-y-4">
+                <!-- Form fields will be inserted here dynamically -->
+            </div>
+            <div class="flex justify-end space-x-2 mt-6">
+                <button type="button" id="cancelBtn" class="bg-gray-300 text-gray-800 py-2 px-4 rounded-xl hover:bg-gray-400">Cancel</button>
+                <button type="submit" id="submitBtn" class="bg-blue-500 text-white py-2 px-4 rounded-xl hover:bg-blue-600">Submit</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // --- Data Management using localStorage ---
+
+    const storage = {
+        get: (key) => {
+            const data = localStorage.getItem(key);
+            return data ? JSON.parse(data) : [];
+        },
+        set: (key, value) => {
+            localStorage.setItem(key, JSON.stringify(value));
+        }
+    };
+
+    // Initialize data in localStorage if it doesn't exist
+    if (!localStorage.getItem('students')) storage.set('students', []);
+    if (!localStorage.getItem('courses')) storage.set('courses', []);
+    if (!localStorage.getItem('grades')) storage.set('grades', []);
+
+    const elements = {
+        tableBody: document.getElementById('tableBody'),
+        addStudentBtn: document.getElementById('addStudentBtn'),
+        addCourseBtn: document.getElementById('addCourseBtn'),
+        addGradeBtn: document.getElementById('addGradeBtn'),
+        showRecordsBtn: document.getElementById('showRecordsBtn'),
+        searchBtn: document.getElementById('searchBtn'),
+        deleteBtn: document.getElementById('deleteBtn'),
+        exportBtn: document.getElementById('exportBtn'),
+        searchInput: document.getElementById('searchInput'),
+        inputModal: document.getElementById('inputModal'),
+        modalTitle: document.getElementById('modalTitle'),
+        modalFormContent: document.getElementById('modalFormContent'),
+        modalForm: document.getElementById('modalForm'),
+        cancelBtn: document.getElementById('cancelBtn'),
+    };
+
+    const gradeOptions = ["A", "B", "C", "D", "F"];
+
+    // --- Modal Logic ---
+    function showModal(title, contentHTML, onSubmit) {
+        elements.modalTitle.textContent = title;
+        elements.modalFormContent.innerHTML = contentHTML;
+        elements.inputModal.style.display = 'flex';
+        
+        const form = elements.modalForm;
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            onSubmit(e.target);
+            hideModal();
+        };
+    }
+
+    function hideModal() {
+        elements.inputModal.style.display = 'none';
+        elements.modalForm.onsubmit = null;
+    }
+    
+    elements.cancelBtn.onclick = hideModal;
+
+    // --- Core Functions ---
+
+    function addStudent() {
+        const content = `
+            <div>
+                <label class="block text-gray-700">Student ID:</label>
+                <input type="text" name="id" class="w-full p-2 border rounded-lg" required>
+            </div>
+            <div>
+                <label class="block text-gray-700">Student Name:</label>
+                <input type="text" name="name" class="w-full p-2 border rounded-lg" required>
+            </div>
+        `;
+        showModal('Add New Student', content, (form) => {
+            const id = form.id.value.trim();
+            const name = form.name.value.trim();
+            const students = storage.get('students');
+            if (students.some(s => s.id === id)) {
+                showMessage("Student ID already exists!");
+                return;
+            }
+            students.push({ id, name });
+            storage.set('students', students);
+            showMessage("Student added successfully!");
+        });
+    }
+
+    function addCourse() {
+        const content = `
+            <div>
+                <label class="block text-gray-700">Course ID:</label>
+                <input type="text" name="id" class="w-full p-2 border rounded-lg" required>
+            </div>
+            <div>
+                <label class="block text-gray-700">Course Title:</label>
+                <input type="text" name="title" class="w-full p-2 border rounded-lg" required>
+            </div>
+        `;
+        showModal('Add New Course', content, (form) => {
+            const id = form.id.value.trim();
+            const title = form.title.value.trim();
+            const courses = storage.get('courses');
+            if (courses.some(c => c.id === id)) {
+                showMessage("Course ID already exists!");
+                return;
+            }
+            courses.push({ id, title });
+            storage.set('courses', courses);
+            showMessage("Course added successfully!");
+        });
+    }
+
+    function addGrade() {
+        const students = storage.get('students');
+        const courses = storage.get('courses');
+        
+        if (students.length === 0 || courses.length === 0) {
+            showMessage("Please add students and courses first.");
+            return;
+        }
+
+        const studentOptions = students.map(s => `<option value="${s.id}">${s.id} - ${s.name}</option>`).join('');
+        const courseOptions = courses.map(c => `<option value="${c.id}">${c.id} - ${c.title}</option>`).join('');
+        const gradeOptionsHTML = gradeOptions.map(g => `<option value="${g}">${g}</option>`).join('');
+
+        const content = `
+            <div>
+                <label class="block text-gray-700">Select Student:</label>
+                <select name="studentId" class="w-full p-2 border rounded-lg">${studentOptions}</select>
+            </div>
+            <div>
+                <label class="block text-gray-700">Select Course:</label>
+                <select name="courseId" class="w-full p-2 border rounded-lg">${courseOptions}</select>
+            </div>
+            <div>
+                <label class="block text-gray-700">Select Grade:</label>
+                <select name="grade" class="w-full p-2 border rounded-lg">${gradeOptionsHTML}</select>
+            </div>
+        `;
+
+        showModal('Add New Grade', content, (form) => {
+            const studentId = form.studentId.value;
+            const courseId = form.courseId.value;
+            const grade = form.grade.value;
+            const grades = storage.get('grades');
+            // Update existing grade or add new one
+            const existingIndex = grades.findIndex(g => g.studentId === studentId && g.courseId === courseId);
+            if (existingIndex !== -1) {
+                grades[existingIndex].grade = grade;
+            } else {
+                grades.push({ studentId, courseId, grade });
+            }
+            storage.set('grades', grades);
+            showMessage("Grade added successfully!");
+            loadAllRecords(); // Refresh the table
+        });
+    }
+
+    function loadAllRecords() {
+        elements.tableBody.innerHTML = '';
+        const students = storage.get('students');
+        const courses = storage.get('courses');
+        const grades = storage.get('grades');
+
+        grades.forEach(gradeRecord => {
+            const student = students.find(s => s.id === gradeRecord.studentId);
+            const course = courses.find(c => c.id === gradeRecord.courseId);
+            
+            if (student && course) {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${course.title}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 grade-cell" data-student-id="${student.id}" data-course-id="${course.id}">
+                        <select class="p-1 border rounded-lg bg-gray-50 grade-select">
+                            ${gradeOptions.map(g => `<option value="${g}" ${g === gradeRecord.grade ? 'selected' : ''}>${g}</option>`).join('')}
+                        </select>
+                    </td>
+                `;
+                elements.tableBody.appendChild(row);
+            }
+        });
+        
+        // Add event listener for grade changes
+        document.querySelectorAll('.grade-select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const studentId = e.target.closest('.grade-cell').dataset.studentId;
+                const courseId = e.target.closest('.grade-cell').dataset.courseId;
+                const newGrade = e.target.value;
+                updateGradeInStorage(studentId, courseId, newGrade);
+            });
+        });
+    }
+
+    function updateGradeInStorage(studentId, courseId, newGrade) {
+        const grades = storage.get('grades');
+        const gradeIndex = grades.findIndex(g => g.studentId === studentId && g.courseId === courseId);
+        if (gradeIndex !== -1) {
+            grades[gradeIndex].grade = newGrade;
+            storage.set('grades', grades);
+            showMessage("Grade updated successfully!");
+        }
+    }
+
+    function searchStudent() {
+        const searchTerm = elements.searchInput.value.trim().toLowerCase();
+        const rows = elements.tableBody.getElementsByTagName('tr');
+        let found = false;
+        for (let row of rows) {
+            const studentIdCell = row.cells[1]; // ID is the second column
+            const studentId = studentIdCell.textContent.toLowerCase();
+            if (studentId.includes(searchTerm) || searchTerm === '') {
+                row.style.display = '';
+                found = true;
+            } else {
+                row.style.display = 'none';
+            }
+        }
+        if (!found && searchTerm !== '') {
+            showMessage("No student found with that ID.");
+        }
+    }
+
+    function deleteStudent() {
+        const id = elements.searchInput.value.trim();
+        if (!id) {
+            showMessage("Please enter a Student ID to delete.");
+            return;
+        }
+
+        const students = storage.get('students');
+        const newStudents = students.filter(s => s.id !== id);
+        
+        if (newStudents.length === students.length) {
+            showMessage("Student not found.");
+            return;
+        }
+
+        storage.set('students', newStudents);
+
+        const grades = storage.get('grades');
+        const newGrades = grades.filter(g => g.studentId !== id);
+        storage.set('grades', newGrades);
+
+        showMessage("Student and their grades deleted successfully!");
+        elements.searchInput.value = '';
+        loadAllRecords();
+    }
+    
+    function exportToCSV() {
+        const students = storage.get('students');
+        const grades = storage.get('grades');
+        const courses = storage.get('courses');
+        
+        if (students.length === 0 || grades.length === 0 || courses.length === 0) {
+            showMessage("No data to export!");
+            return;
+        }
+        
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Name,ID,Course,Grade\n";
+        
+        grades.forEach(gradeRecord => {
+            const student = students.find(s => s.id === gradeRecord.studentId);
+            const course = courses.find(c => c.id === gradeRecord.courseId);
+            
+            if (student && course) {
+                const row = `"${student.name}","${student.id}","${course.title}","${gradeRecord.grade}"\n`;
+                csvContent += row;
+            }
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "student_records.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showMessage("Data exported to student_records.csv successfully!");
+    }
+
+    function showMessage(msg) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'fixed bottom-4 right-4 bg-gray-800 text-white py-2 px-4 rounded-lg shadow-xl animate-fade-in-up z-50';
+        messageDiv.textContent = msg;
+        document.body.appendChild(messageDiv);
+        setTimeout(() => {
+            messageDiv.classList.add('animate-fade-out-down');
+            messageDiv.addEventListener('animationend', () => messageDiv.remove());
+        }, 3000);
+    }
+
+    // --- Event Listeners ---
+    document.addEventListener('DOMContentLoaded', () => {
+        elements.addStudentBtn.addEventListener('click', addStudent);
+        elements.addCourseBtn.addEventListener('click', addCourse);
+        elements.addGradeBtn.addEventListener('click', addGrade);
+        elements.showRecordsBtn.addEventListener('click', loadAllRecords);
+        elements.searchBtn.addEventListener('click', searchStudent);
+        elements.deleteBtn.addEventListener('click', deleteStudent);
+        elements.exportBtn.addEventListener('click', exportToCSV);
+    });
+
+</script>
+
+</body>
+</html>
