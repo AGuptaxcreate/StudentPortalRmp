@@ -85,6 +85,9 @@
             <img src="srmlo.webp" alt="SRM Logo">
             <h1>SRM Student Portal</h1>
         </div>
+        <div class="mt-2 md:mt-0 text-white text-sm font-light text-center">
+            <p id="appIdDisplay">App ID: Loading...</p>
+        </div>
     </header>
 
     <div id="mainContent" class="p-4 md:p-10">
@@ -115,6 +118,9 @@
             </button>
             <button id="exportBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105 w-full md:w-auto">
                 Export to CSV
+            </button>
+            <button id="copyLinkBtn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-xl shadow-md transition-colors duration-300 transform hover:scale-105 w-full md:w-auto">
+                Copy Shared Link
             </button>
         </div>
 
@@ -154,11 +160,22 @@
         </div>
     </div>
 
-    <script type="text/javascript">
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, addDoc, updateDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Firebase global variables provided by the environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let db;
+        let auth;
         let studentsData = [];
         let coursesData = [];
         let gradesData = [];
-        
+
         // UI Element references
         const elements = {
             tableBody: document.getElementById('tableBody'),
@@ -169,44 +186,75 @@
             searchBtn: document.getElementById('searchBtn'),
             deleteBtn: document.getElementById('deleteBtn'),
             exportBtn: document.getElementById('exportBtn'),
+            copyLinkBtn: document.getElementById('copyLinkBtn'),
             searchInput: document.getElementById('searchInput'),
             inputModal: document.getElementById('inputModal'),
             modalTitle: document.getElementById('modalTitle'),
             modalFormContent: document.getElementById('modalFormContent'),
             modalForm: document.getElementById('modalForm'),
             cancelBtn: document.getElementById('cancelBtn'),
+            appIdDisplay: document.getElementById('appIdDisplay')
         };
         
         const gradeOptions = ["A", "B", "C", "D", "F"];
 
-        // --- URL Data Functions ---
-        function saveDataToURL() {
-            const data = {
-                students: studentsData,
-                courses: coursesData,
-                grades: gradesData,
-            };
-            const encodedData = encodeURIComponent(JSON.stringify(data));
-            window.location.hash = encodedData;
-            showToast("Data saved to URL successfully!");
+        // --- Firebase Initialization and Authentication ---
+        async function initializeFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        elements.appIdDisplay.textContent = `App ID: ${appId}`;
+                        setupRealtimeListeners();
+                    } else {
+                        // Sign in anonymously if no auth token is provided
+                        try {
+                            if (initialAuthToken) {
+                                await signInWithCustomToken(auth, initialAuthToken);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                        } catch (error) {
+                            console.error("Firebase auth error:", error);
+                            showToast("Authentication failed. Please check your console for errors.");
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                showToast("Failed to initialize Firebase. Check console for details.");
+            }
         }
 
-        function loadDataFromURL() {
-            if (window.location.hash) {
-                try {
-                    const encodedData = window.location.hash.substring(1);
-                    const decodedData = JSON.parse(decodeURIComponent(encodedData));
-                    studentsData = decodedData.students || [];
-                    coursesData = decodedData.courses || [];
-                    gradesData = decodedData.grades || [];
-                } catch (e) {
-                    console.error("Invalid URL data:", e);
-                    showToast("Could not load data from URL. Starting with a blank slate.");
-                    studentsData = [];
-                    coursesData = [];
-                    gradesData = [];
-                }
-            }
+        // --- Firestore Collection Path ---
+        // Now using a public data path for collaboration
+        function getCollectionPath(collectionName) {
+            return `artifacts/${appId}/public/data/${collectionName}`;
+        }
+
+        function setupRealtimeListeners() {
+            if (!db) return;
+
+            const studentQuery = collection(db, getCollectionPath('students'));
+            onSnapshot(studentQuery, (snapshot) => {
+                studentsData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+                loadAllRecords();
+            });
+
+            const courseQuery = collection(db, getCollectionPath('courses'));
+            onSnapshot(courseQuery, (snapshot) => {
+                coursesData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+                loadAllRecords();
+            });
+
+            const gradeQuery = collection(db, getCollectionPath('grades'));
+            onSnapshot(gradeQuery, (snapshot) => {
+                gradesData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+                loadAllRecords();
+            });
         }
 
         // --- Modal Logic ---
@@ -242,7 +290,7 @@
 
         // --- Core Functions ---
 
-        function addStudent() {
+        async function addStudent() {
             const content = `
                 <div>
                     <label class="block text-gray-700">Student ID:</label>
@@ -253,7 +301,7 @@
                     <input type="text" name="name" class="w-full p-2 border rounded-lg" required>
                 </div>
             `;
-            showModal('Add New Student', content, (form) => {
+            showModal('Add New Student', content, async (form) => {
                 const id = form.id.value.trim();
                 const name = form.name.value.trim();
 
@@ -262,15 +310,19 @@
                     showToast("Student ID already exists!");
                     return;
                 }
-
-                studentsData.push({ id, name });
-                hideModal();
-                saveDataToURL();
-                loadAllRecords();
+                
+                try {
+                    await addDoc(collection(db, getCollectionPath('students')), { id, name });
+                    hideModal();
+                    showToast("Student added successfully!");
+                } catch (error) {
+                    console.error("Error adding student:", error);
+                    showToast("Failed to add student.");
+                }
             });
         }
 
-        function addCourse() {
+        async function addCourse() {
             const content = `
                 <div>
                     <label class="block text-gray-700">Course ID:</label>
@@ -281,7 +333,7 @@
                     <input type="text" name="title" class="w-full p-2 border rounded-lg" required>
                 </div>
             `;
-            showModal('Add New Course', content, (form) => {
+            showModal('Add New Course', content, async (form) => {
                 const id = form.id.value.trim();
                 const title = form.title.value.trim();
                 
@@ -291,31 +343,35 @@
                     return;
                 }
 
-                coursesData.push({ id, title });
-                hideModal();
-                saveDataToURL();
-                loadAllRecords();
+                try {
+                    await addDoc(collection(db, getCollectionPath('courses')), { id, title });
+                    hideModal();
+                    showToast("Course added successfully!");
+                } catch (error) {
+                    console.error("Error adding course:", error);
+                    showToast("Failed to add course.");
+                }
             });
         }
 
-        function addGrade() {
+        async function addGrade() {
             if (studentsData.length === 0 || coursesData.length === 0) {
                 showToast("Please add students and courses first.");
                 return;
             }
 
-            const studentOptions = studentsData.map(s => `<option value="${s.id}">${s.id} - ${s.name}</option>`).join('');
-            const courseOptions = coursesData.map(c => `<option value="${c.id}">${c.id} - ${c.title}</option>`).join('');
+            const studentOptions = studentsData.map(s => `<option value="${s.docId}">${s.id} - ${s.name}</option>`).join('');
+            const courseOptions = coursesData.map(c => `<option value="${c.docId}">${c.id} - ${c.title}</option>`).join('');
             const gradeOptionsHTML = gradeOptions.map(g => `<option value="${g}">${g}</option>`).join('');
 
             const content = `
                 <div>
                     <label class="block text-gray-700">Select Student:</label>
-                    <select name="studentId" class="w-full p-2 border rounded-lg">${studentOptions}</select>
+                    <select name="studentDocId" class="w-full p-2 border rounded-lg">${studentOptions}</select>
                 </div>
                 <div>
                     <label class="block text-gray-700">Select Course:</label>
-                    <select name="courseId" class="w-full p-2 border rounded-lg">${courseOptions}</select>
+                    <select name="courseDocId" class="w-full p-2 border rounded-lg">${courseOptions}</select>
                 </div>
                 <div>
                     <label class="block text-gray-700">Select Grade:</label>
@@ -323,21 +379,25 @@
                 </div>
             `;
 
-            showModal('Add New Grade', content, (form) => {
-                const studentId = form.studentId.value;
-                const courseId = form.courseId.value;
+            showModal('Add New Grade', content, async (form) => {
+                const studentDocId = form.studentDocId.value;
+                const courseDocId = form.courseDocId.value;
                 const grade = form.grade.value;
                 
-                const existingGradeIndex = gradesData.findIndex(g => g.studentId === studentId && g.courseId === courseId);
-                
-                if (existingGradeIndex !== -1) {
-                    gradesData[existingGradeIndex].grade = grade;
-                } else {
-                    gradesData.push({ studentId, courseId, grade });
+                const existingGrade = gradesData.find(g => g.studentDocId === studentDocId && g.courseDocId === courseDocId);
+
+                try {
+                    if (existingGrade) {
+                        await updateDoc(doc(db, getCollectionPath('grades'), existingGrade.docId), { grade });
+                    } else {
+                        await addDoc(collection(db, getCollectionPath('grades')), { studentDocId, courseDocId, grade });
+                    }
+                    hideModal();
+                    showToast("Grade updated successfully!");
+                } catch (error) {
+                    console.error("Error updating grade:", error);
+                    showToast("Failed to update grade.");
                 }
-                hideModal();
-                saveDataToURL();
-                loadAllRecords();
             });
         }
 
@@ -345,8 +405,8 @@
             elements.tableBody.innerHTML = '';
             
             gradesData.forEach(gradeRecord => {
-                const student = studentsData.find(s => s.id === gradeRecord.studentId);
-                const course = coursesData.find(c => c.id === gradeRecord.courseId);
+                const student = studentsData.find(s => s.docId === gradeRecord.studentDocId);
+                const course = coursesData.find(c => c.docId === gradeRecord.courseDocId);
                 
                 if (student && course) {
                     const row = document.createElement('tr');
@@ -354,7 +414,7 @@
                         <td class="px-4 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.name}</td>
                         <td class="px-4 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-500">${student.id}</td>
                         <td class="px-4 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-500">${course.title}</td>
-                        <td class="px-4 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-500 grade-cell" data-student-id="${student.id}" data-course-id="${gradeRecord.courseId}">
+                        <td class="px-4 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-500 grade-cell" data-grade-docid="${gradeRecord.docId}">
                             <select class="p-1 border rounded-lg bg-gray-50 grade-select">
                                 ${gradeOptions.map(g => `<option value="${g}" ${g === gradeRecord.grade ? 'selected' : ''}>${g}</option>`).join('')}
                             </select>
@@ -365,22 +425,18 @@
             });
             
             document.querySelectorAll('.grade-select').forEach(select => {
-                select.addEventListener('change', (e) => {
-                    const studentId = e.target.closest('.grade-cell').dataset.studentId;
-                    const courseId = e.target.closest('.grade-cell').dataset.courseId;
+                select.addEventListener('change', async (e) => {
+                    const gradeDocId = e.target.closest('.grade-cell').dataset.gradeDocid;
                     const newGrade = e.target.value;
-                    updateGradeInURL(studentId, courseId, newGrade);
+                    try {
+                        await updateDoc(doc(db, getCollectionPath('grades'), gradeDocId), { grade: newGrade });
+                        showToast("Grade updated successfully!");
+                    } catch (error) {
+                        console.error("Error updating grade:", error);
+                        showToast("Failed to update grade.");
+                    }
                 });
             });
-        }
-
-        function updateGradeInURL(studentId, courseId, newGrade) {
-            const gradeRecordIndex = gradesData.findIndex(g => g.studentId === studentId && g.courseId === courseId);
-            if (gradeRecordIndex !== -1) {
-                gradesData[gradeRecordIndex].grade = newGrade;
-                saveDataToURL();
-                showToast("Grade updated successfully!");
-            }
         }
 
         function searchStudent() {
@@ -402,32 +458,51 @@
             }
         }
 
-        function deleteStudent() {
+        async function deleteStudent() {
             const id = elements.searchInput.value.trim();
             if (!id) {
                 showToast("Please enter a Student ID to delete.");
                 return;
             }
 
-            const studentIndex = studentsData.findIndex(s => s.id === id);
-            if (studentIndex === -1) {
+            const studentToDelete = studentsData.find(s => s.id === id);
+            if (!studentToDelete) {
                 showToast("Student not found.");
                 return;
             }
 
-            // Remove the student
-            studentsData.splice(studentIndex, 1);
-            
-            // Remove all grades associated with the student
-            gradesData = gradesData.filter(g => g.studentId !== id);
+            const confirmModalContent = `
+                <p>Are you sure you want to delete student ID <strong>${id}</strong>? This will also delete all associated grades.</p>
+                <div class="flex justify-end space-x-2 mt-6">
+                    <button type="button" id="confirmCancelBtn" class="bg-gray-300 text-gray-800 py-2 px-4 rounded-xl hover:bg-gray-400">Cancel</button>
+                    <button type="button" id="confirmDeleteBtn" class="bg-red-500 text-white py-2 px-4 rounded-xl hover:bg-red-600">Delete</button>
+                </div>
+            `;
+            showModal('Confirm Deletion', confirmModalContent, () => {});
 
-            showToast("Student and their grades deleted successfully!");
-            elements.searchInput.value = '';
-            saveDataToURL();
-            loadAllRecords();
+            document.getElementById('confirmCancelBtn').onclick = hideModal;
+            document.getElementById('confirmDeleteBtn').onclick = async () => {
+                hideModal();
+                try {
+                    // Find all grades associated with the student to delete
+                    const gradesToDelete = gradesData.filter(g => g.studentDocId === studentToDelete.docId);
+                    
+                    // Delete all associated grades
+                    await Promise.all(gradesToDelete.map(g => deleteDoc(doc(db, getCollectionPath('grades'), g.docId))));
+
+                    // Delete the student document
+                    await deleteDoc(doc(db, getCollectionPath('students'), studentToDelete.docId));
+                    
+                    showToast("Student and their grades deleted successfully!");
+                    elements.searchInput.value = '';
+                } catch (error) {
+                    console.error("Error deleting student:", error);
+                    showToast("Failed to delete student.");
+                }
+            };
         }
         
-        function exportToCSV() {
+        async function exportToCSV() {
             if (studentsData.length === 0 && gradesData.length === 0) {
                 showToast("No data to export!");
                 return;
@@ -437,8 +512,8 @@
             csvContent += "Name,ID,Course,Grade\n";
             
             gradesData.forEach(gradeRecord => {
-                const student = studentsData.find(s => s.id === gradeRecord.studentId);
-                const course = coursesData.find(c => c.id === gradeRecord.courseId);
+                const student = studentsData.find(s => s.docId === gradeRecord.studentDocId);
+                const course = coursesData.find(c => c.docId === gradeRecord.courseDocId);
                 
                 if (student && course) {
                     const row = `"${student.name}","${student.id}","${course.title}","${gradeRecord.grade}"\n`;
@@ -455,11 +530,34 @@
             document.body.removeChild(link);
             showToast("Data exported to student_records.csv successfully!");
         }
+        
+        function copySharedLink() {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(window.location.href).then(() => {
+                    showToast("Shareable link copied to clipboard!");
+                }).catch(err => {
+                    console.error('Could not copy text: ', err);
+                    showToast("Failed to copy link. Please copy it manually from the address bar.");
+                });
+            } else {
+                const textarea = document.createElement('textarea');
+                textarea.value = window.location.href;
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast("Shareable link copied to clipboard!");
+                } catch (err) {
+                    console.error('Could not copy text: ', err);
+                    showToast("Failed to copy link. Please copy it manually from the address bar.");
+                }
+                document.body.removeChild(textarea);
+            }
+        }
 
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
-            loadDataFromURL();
-            loadAllRecords();
+            initializeFirebase();
             elements.addStudentBtn.addEventListener('click', addStudent);
             elements.addCourseBtn.addEventListener('click', addCourse);
             elements.addGradeBtn.addEventListener('click', addGrade);
@@ -467,6 +565,7 @@
             elements.searchBtn.addEventListener('click', searchStudent);
             elements.deleteBtn.addEventListener('click', deleteStudent);
             elements.exportBtn.addEventListener('click', exportToCSV);
+            elements.copyLinkBtn.addEventListener('click', copySharedLink);
         });
     </script>
 </body>
