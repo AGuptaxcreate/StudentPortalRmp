@@ -18,12 +18,13 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body {
-             font-family: 'Inter', sans-serif;
-            background-image: url('srm.webp');
-            background-size: cover;
-            background-position: center; 
-            background-repeat: no-repeat; 
-            background-color: #a4c2fc;
+            font-family: 'Inter', sans-serif;
+            /* Update the background to use an image */
+            background-image: url('srm.webp'); /* Replace with your image URL */
+            background-size: cover; /* This makes the image cover the entire body */
+            background-position: center; /* This centers the image */
+            background-repeat: no-repeat; /* Prevents the image from repeating */
+            background-color: #a4c2fc; /* Fallback color */
         }
         header {
             background: rgba(0, 0, 0, 0.6);
@@ -351,6 +352,11 @@
         // --- Core Functions ---
 
         async function addStudent() {
+            if (!userId) {
+                showToast("Please wait for authentication to complete.");
+                return;
+            }
+
             const { addDoc, collection } = window.firebaseImports;
             const content = `
                 <div>
@@ -384,6 +390,11 @@
         }
 
         async function addCourse() {
+            if (!userId) {
+                showToast("Please wait for authentication to complete.");
+                return;
+            }
+
             const { addDoc, collection } = window.firebaseImports;
             const content = `
                 <div>
@@ -417,6 +428,11 @@
         }
 
         async function addGrade() {
+            if (!userId) {
+                showToast("Please wait for authentication to complete.");
+                return;
+            }
+
             const { addDoc, collection, updateDoc, doc } = window.firebaseImports;
             if (studentsData.length === 0 || coursesData.length === 0) {
                 showToast("Please add students and courses first.");
@@ -617,4 +633,3 @@
     </script>
 </body>
 </html>
-
