@@ -179,23 +179,33 @@
         
         const gradeOptions = ["A", "B", "C", "D", "F"];
 
-        // --- Local Storage Functions ---
-        function saveData() {
-            localStorage.setItem('students', JSON.stringify(studentsData));
-            localStorage.setItem('courses', JSON.stringify(coursesData));
-            localStorage.setItem('grades', JSON.stringify(gradesData));
+        // --- URL Data Functions ---
+        function saveDataToURL() {
+            const data = {
+                students: studentsData,
+                courses: coursesData,
+                grades: gradesData,
+            };
+            const encodedData = encodeURIComponent(JSON.stringify(data));
+            window.location.hash = encodedData;
+            showToast("Data saved to URL successfully!");
         }
 
-        function loadData() {
-            try {
-                studentsData = JSON.parse(localStorage.getItem('students')) || [];
-                coursesData = JSON.parse(localStorage.getItem('courses')) || [];
-                gradesData = JSON.parse(localStorage.getItem('grades')) || [];
-            } catch (e) {
-                console.error("Error loading data from localStorage:", e);
-                studentsData = [];
-                coursesData = [];
-                gradesData = [];
+        function loadDataFromURL() {
+            if (window.location.hash) {
+                try {
+                    const encodedData = window.location.hash.substring(1);
+                    const decodedData = JSON.parse(decodeURIComponent(encodedData));
+                    studentsData = decodedData.students || [];
+                    coursesData = decodedData.courses || [];
+                    gradesData = decodedData.grades || [];
+                } catch (e) {
+                    console.error("Invalid URL data:", e);
+                    showToast("Could not load data from URL. Starting with a blank slate.");
+                    studentsData = [];
+                    coursesData = [];
+                    gradesData = [];
+                }
             }
         }
 
@@ -254,9 +264,8 @@
                 }
 
                 studentsData.push({ id, name });
-                saveData();
-                showToast("Student added successfully!");
                 hideModal();
+                saveDataToURL();
                 loadAllRecords();
             });
         }
@@ -283,9 +292,8 @@
                 }
 
                 coursesData.push({ id, title });
-                saveData();
-                showToast("Course added successfully!");
                 hideModal();
+                saveDataToURL();
                 loadAllRecords();
             });
         }
@@ -327,9 +335,8 @@
                 } else {
                     gradesData.push({ studentId, courseId, grade });
                 }
-                saveData();
-                showToast("Grade added/updated successfully!");
                 hideModal();
+                saveDataToURL();
                 loadAllRecords();
             });
         }
@@ -362,16 +369,16 @@
                     const studentId = e.target.closest('.grade-cell').dataset.studentId;
                     const courseId = e.target.closest('.grade-cell').dataset.courseId;
                     const newGrade = e.target.value;
-                    updateGradeInLocalStorage(studentId, courseId, newGrade);
+                    updateGradeInURL(studentId, courseId, newGrade);
                 });
             });
         }
 
-        function updateGradeInLocalStorage(studentId, courseId, newGrade) {
+        function updateGradeInURL(studentId, courseId, newGrade) {
             const gradeRecordIndex = gradesData.findIndex(g => g.studentId === studentId && g.courseId === courseId);
             if (gradeRecordIndex !== -1) {
                 gradesData[gradeRecordIndex].grade = newGrade;
-                saveData();
+                saveDataToURL();
                 showToast("Grade updated successfully!");
             }
         }
@@ -414,9 +421,9 @@
             // Remove all grades associated with the student
             gradesData = gradesData.filter(g => g.studentId !== id);
 
-            saveData();
             showToast("Student and their grades deleted successfully!");
             elements.searchInput.value = '';
+            saveDataToURL();
             loadAllRecords();
         }
         
@@ -451,7 +458,7 @@
 
         // --- Event Listeners ---
         document.addEventListener('DOMContentLoaded', () => {
-            loadData();
+            loadDataFromURL();
             loadAllRecords();
             elements.addStudentBtn.addEventListener('click', addStudent);
             elements.addCourseBtn.addEventListener('click', addCourse);
