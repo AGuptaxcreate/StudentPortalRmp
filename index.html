@@ -201,6 +201,7 @@
         // --- Firebase Initialization and Authentication ---
         async function initializeFirebase() {
             try {
+                console.log("Attempting to initialize Firebase...");
                 if (Object.keys(firebaseConfig).length === 0) {
                     console.error("Firebase config is missing. Cannot initialize Firebase.");
                     showToast("Firebase configuration is missing.");
@@ -209,12 +210,14 @@
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
+                console.log("Firebase initialized successfully.");
 
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         console.log("Authentication successful. User ID:", user.uid);
                         setupRealtimeListeners();
                     } else {
+                        console.log("No authenticated user found. Signing in...");
                         // Sign in anonymously if no auth token is provided
                         try {
                             if (initialAuthToken) {
@@ -241,24 +244,37 @@
         }
 
         function setupRealtimeListeners() {
-            if (!db) return;
+            if (!db) {
+                console.error("Firestore database is not initialized. Cannot set up listeners.");
+                return;
+            }
+            console.log("Setting up real-time listeners for data.");
 
             const studentQuery = collection(db, getCollectionPath('students'));
             onSnapshot(studentQuery, (snapshot) => {
                 studentsData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
                 loadAllRecords();
+            }, (error) => {
+                console.error("Error listening to students collection:", error);
+                showToast("Error loading student data.");
             });
 
             const courseQuery = collection(db, getCollectionPath('courses'));
             onSnapshot(courseQuery, (snapshot) => {
                 coursesData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
                 loadAllRecords();
+            }, (error) => {
+                console.error("Error listening to courses collection:", error);
+                showToast("Error loading course data.");
             });
 
             const gradeQuery = collection(db, getCollectionPath('grades'));
             onSnapshot(gradeQuery, (snapshot) => {
                 gradesData = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
                 loadAllRecords();
+            }, (error) => {
+                console.error("Error listening to grades collection:", error);
+                showToast("Error loading grade data.");
             });
         }
 
@@ -419,7 +435,7 @@
                         <td class="px-4 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.name}</td>
                         <td class="px-4 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-500">${student.id}</td>
                         <td class="px-4 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-500">${course.title}</td>
-                        <td class="px-4 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-500 grade-cell" data-grade-docid="${gradeRecord.docId}">
+                        <td class="px-4 py-2 sm:px-6 sm:py-4 whitespace-nowrap text-sm text-gray-500 grade-cell" data-grade-doc-id="${gradeRecord.docId}">
                             <select class="p-1 border rounded-lg bg-gray-50 grade-select">
                                 ${gradeOptions.map(g => `<option value="${g}" ${g === gradeRecord.grade ? 'selected' : ''}>${g}</option>`).join('')}
                             </select>
@@ -431,7 +447,7 @@
             
             document.querySelectorAll('.grade-select').forEach(select => {
                 select.addEventListener('change', async (e) => {
-                    const gradeDocId = e.target.closest('.grade-cell').dataset.grade-docid;
+                    const gradeDocId = e.target.closest('.grade-cell').dataset.gradeDocId;
                     const newGrade = e.target.value;
                     try {
                         await updateDoc(doc(db, getCollectionPath('grades'), gradeDocId), { grade: newGrade });
